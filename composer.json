@@ -1,0 +1,30 @@
+{
+    "name": "innmind/testing",
+    "type": "library",
+    "description": "",
+    "keywords": [],
+    "homepage": "http://github.com/innmind/testing",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Baptiste Langlade",
+            "email": "baptiste.langlade@hey.com"
+        }
+    ],
+    "support": {
+        "issues": "http://github.com/innmind/testing/issues"
+    },
+    "require": {
+        "php": "~8.2"
+    },
+    "autoload": {
+        "psr-4": {
+            "Innmind\\Testing\\": "src/"
+        }
+    },
+    "require-dev": {
+        "innmind/static-analysis": "^1.2.1",
+        "innmind/black-box": "~6.5",
+        "innmind/coding-standard": "~2.0"
+    }
+}
