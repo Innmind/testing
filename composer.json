@@ -15,7 +15,7 @@
         "issues": "http://github.com/innmind/testing/issues"
     },
     "require": {
-        "php": "~8.2",
+        "php": "~8.4",
         "innmind/foundation": "~1.10"
     },
     "autoload": {
