@@ -2,7 +2,7 @@
 declare(strict_types = 1);
 
 use Innmind\Testing\Factory;
-use Innmind\TimeContinuum\Format;
+use Innmind\TimeContinuum\Period;
 use Fixtures\Innmind\TimeContinuum\PointInTime;
 
 return static function() {
@@ -13,11 +13,13 @@ return static function() {
         ),
         static function($assert, $point) {
             $os = Factory::new()
-                ->startClockAt($point->format(Format::iso8601()))
+                ->startClockAt($point)
                 ->build();
-            $now = $os->clock()->now();
+            $os->process()->halt(Period::microsecond(1));
 
+            $now = $os->clock()->now();
             $assert->true($now->aheadOf($point));
+            $os->process()->halt(Period::microsecond(1));
             $assert->true(
                 $os->clock()->now()->aheadOf($now),
             );

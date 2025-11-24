@@ -3,14 +3,12 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing;
 
+use Innmind\Testing\Machine\ProcessBuilder;
 use Innmind\OperatingSystem\{
     OperatingSystem,
     Factory as OSFactory,
 };
-use Innmind\Server\Control\{
-    Server\Command,
-    Servers\Mock\ProcessBuilder,
-};
+use Innmind\Server\Control\Server\Command;
 use Innmind\TimeContinuum\PointInTime;
 use Innmind\Immutable\Map;
 
@@ -40,14 +38,12 @@ final class Factory
 
     /**
      * @psalm-mutation-free
-     *
-     * @param non-empty-string $date
      */
     #[\NoDiscard]
-    public function startClockAt(string $date): self
+    public function startClockAt(PointInTime $date): self
     {
         return new self(
-            PointInTime::at(new \DateTimeImmutable($date)),
+            $date,
             $this->executables,
         );
     }
