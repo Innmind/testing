@@ -38,7 +38,7 @@ return static function() {
                     ->control()
                     ->processes()
                     ->execute(
-                        Command::foreground('bin')
+                        Command::foreground('foo')
                             ->withArgument('display')
                             ->withOption('option'),
                     )
