@@ -9,8 +9,16 @@ use Innmind\OperatingSystem\{
     Factory as OSFactory,
 };
 use Innmind\Server\Control\Server\Command;
+use Innmind\Http\{
+    ServerRequest,
+    Response,
+};
+use Innmind\Url\Url;
 use Innmind\TimeContinuum\PointInTime;
-use Innmind\Immutable\Map;
+use Innmind\Immutable\{
+    Map,
+    Attempt,
+};
 
 final class Factory
 {
@@ -18,10 +26,12 @@ final class Factory
      * @psalm-mutation-free
      *
      * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
+     * @param Map<string, callable(ServerRequest, OperatingSystem): Attempt<Response>> $httpDomains
      */
     private function __construct(
         private ?PointInTime $start,
         private Map $executables,
+        private Map $httpDomains,
     ) {
     }
 
@@ -32,6 +42,7 @@ final class Factory
     {
         return new self(
             null,
+            Map::of(),
             Map::of(),
         );
     }
@@ -45,6 +56,7 @@ final class Factory
         return new self(
             $date,
             $this->executables,
+            $this->httpDomains,
         );
     }
 
@@ -65,6 +77,27 @@ final class Factory
                 $bin,
                 $builder,
             ),
+            $this->httpDomains,
+        );
+    }
+
+    /**
+     * @psalm-mutation-free
+     *
+     * @param callable(ServerRequest, OperatingSystem): Attempt<Response> $handle
+     */
+    #[\NoDiscard]
+    public function handleHttpDomain(
+        Url $domain,
+        callable $handle,
+    ): self {
+        return new self(
+            $this->start,
+            $this->executables,
+            ($this->httpDomains)(
+                $domain->toString(),
+                $handle,
+            ),
         );
     }
 
@@ -78,6 +111,7 @@ final class Factory
                     return $build($command, $builder, $os);
                 };
             }),
+            $this->httpDomains,
         );
         // The new $os is not directly returned in order for callables to have
         // the newly built OS injected at runtime.
