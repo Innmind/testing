@@ -3,7 +3,10 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation;
 
-use Innmind\Testing\Machine\ProcessBuilder;
+use Innmind\Testing\Machine\{
+    ProcessBuilder,
+    Clock,
+};
 use Innmind\OperatingSystem\OperatingSystem;
 use Innmind\Server\Control\Server\Command;
 use Innmind\Http\{
@@ -40,6 +43,7 @@ final class Machine
         Network $network,
         Map $executables,
         Map $http,
+        Clock\Drift $drift,
     ): self {
         $os = Machine\OS::new();
         $processes = Machine\Processes::new(
@@ -49,6 +53,7 @@ final class Machine
         $os->boot(OperatingSystem::new(Machine\Config::of(
             $network,
             $processes,
+            $drift,
         )));
 
         return new self(

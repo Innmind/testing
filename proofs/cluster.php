@@ -13,6 +13,8 @@ use Innmind\Http\{
     Response\StatusCode,
     Method,
     ProtocolVersion,
+    Headers,
+    Header\Date,
 };
 use Innmind\Filesystem\File\Content;
 use Innmind\Url\Url;
@@ -393,6 +395,85 @@ return static function() {
                 'Could not resolve host: remote.dev',
                 $response->body()->toString(),
             );
+        },
+    );
+
+    yield proof(
+        'Time can drift between machines',
+        given(
+            Set::either(
+                Set::integers()->between(10, 1_000),
+                Set::integers()->between(-1_000, -10),
+            ),
+        ),
+        static function($assert, $drift) {
+            $format = Format::of('Y-m-dTH:i:s.v');
+            $remote = Machine::new('remote.dev')
+                ->listenHttp(
+                    static fn($request, $os) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                        null,
+                        Content::ofString(\sprintf(
+                            '%s|%s',
+                            $request->body()->toString(),
+                            $os->clock()->now()->format($format),
+                        )),
+                    )),
+                );
+            $local = Machine::new('local.dev')
+                ->driftClockBy(Machine\Clock\Drift::of(0, $drift))
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::post,
+                            ProtocolVersion::v11,
+                            Headers::of(
+                                Date::of($os->clock()->now()), // to force accessing the second drift
+                            ),
+                            Content::ofString($os->clock()->now()->format($format)),
+                        ))
+                        ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
+                        ->map(static fn($success) => $success->response()->body())
+                        ->map(static fn($body) => Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString(\sprintf(
+                                '%s|%s',
+                                $body->toString(),
+                                $os->clock()->now()->format($format),
+                            )),
+                        )),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap()
+                ->body()
+                ->toString();
+            [$drifted, $remote, $resynced] = \explode('|', $response);
+            // remove last millisecond as the execution of the code can elapse
+            // over 2 miliseconds.
+            $drifted = \substr($drifted, 0, -1);
+            $remote = \substr($remote, 0, -1);
+            $resynced = \substr($resynced, 0, -1);
+
+            $assert
+                ->expected($drifted)
+                ->not()
+                ->same($remote);
+            $assert->same($remote, $resynced);
         },
     );
 };

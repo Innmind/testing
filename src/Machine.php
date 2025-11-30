@@ -28,6 +28,7 @@ final class Machine
         private array $domains,
         private Map $executables,
         private Map $http,
+        private Machine\Clock\Drift $drift,
     ) {
     }
 
@@ -44,6 +45,7 @@ final class Machine
             [$domain, ...$domains],
             Map::of(),
             Map::of(),
+            Machine\Clock\Drift::of(),
         );
     }
 
@@ -62,6 +64,7 @@ final class Machine
             $this->domains,
             ($this->executables)($executable, $builder),
             $this->http,
+            $this->drift,
         );
     }
 
@@ -80,6 +83,21 @@ final class Machine
             $this->domains,
             $this->executables,
             ($this->http)($port, $handle),
+            $this->drift,
+        );
+    }
+
+    /**
+     * @psalm-mutation-free
+     */
+    #[\NoDiscard]
+    public function driftClockBy(Machine\Clock\Drift $drift): self
+    {
+        return new self(
+            $this->domains,
+            $this->executables,
+            $this->http,
+            $drift,
         );
     }
 
@@ -96,6 +114,7 @@ final class Machine
                 $network,
                 $this->executables,
                 $this->http,
+                $this->drift,
             ),
         );
     }
