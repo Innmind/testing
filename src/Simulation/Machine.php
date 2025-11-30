@@ -21,12 +21,11 @@ use Innmind\Immutable\{
 final class Machine
 {
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
      * @param Map<?int, callable(ServerRequest, OperatingSystem): Attempt<Response>> $http
      */
     private function __construct(
-        private OperatingSystem $os,
-        private Map $executables,
+        private Machine\OS $os,
+        private Machine\Processes $processes,
         private Map $http,
         // private Map<string, string> $environment, todo
     ) {
@@ -42,9 +41,19 @@ final class Machine
         Map $executables,
         Map $http,
     ): self {
-        return new self(
-            OperatingSystem::new(Machine\Config::of($network)),
+        $os = Machine\OS::new();
+        $processes = Machine\Processes::new(
+            $os,
             $executables,
+        );
+        $os->boot(OperatingSystem::new(Machine\Config::of(
+            $network,
+            $processes,
+        )));
+
+        return new self(
+            $os,
+            $processes,
             $http,
         );
     }
@@ -82,7 +91,7 @@ final class Machine
             ->http
             ->get($value)
             ->attempt(static fn() => new \RuntimeException('Connection timeout')) // todo inject fake timeout in ntp server ?
-            ->flatMap(fn($http) => $http($serverRequest, $this->os));
+            ->flatMap(fn($http) => $http($serverRequest, $this->os->unwrap()));
     }
 
     // todo allow ssh
