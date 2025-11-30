@@ -70,14 +70,15 @@ final class Machine
             false => $port->value(),
         };
 
+        // Simulate network by preventing iterating over the request/response
+        // bodies twice. Though this approach prevents streaming, todo use
+        // `Sequence::defer()` instead ?
+
         $serverRequest = ServerRequest::of(
             $request->url(),
             $request->method(),
             $request->protocolVersion(),
             $request->headers(),
-            // Simulate network by preventing iterating over the initial body
-            // twice. Though this approach prevents streaming, use
-            // `Sequence::defer()` instead ?
             Content::ofChunks(
                 $request
                     ->body()
@@ -91,7 +92,18 @@ final class Machine
             ->http
             ->get($value)
             ->attempt(static fn() => new \RuntimeException('Connection timeout')) // todo inject fake timeout in ntp server ?
-            ->flatMap(fn($http) => $http($serverRequest, $this->os->unwrap()));
+            ->flatMap(fn($http) => $http($serverRequest, $this->os->unwrap()))
+            ->map(static fn($response) => Response::of(
+                $response->statusCode(),
+                $response->protocolVersion(),
+                $response->headers(),
+                Content::ofChunks(
+                    $response
+                        ->body()
+                        ->chunks()
+                        ->snap(),
+                ),
+            ));
     }
 
     // todo allow ssh

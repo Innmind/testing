@@ -3,12 +3,31 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation\Machine;
 
-use Innmind\Testing\Simulation\Network;
+use Innmind\Testing\{
+    Simulation\Network,
+    Exception\CouldNotResolveHost,
+};
 use Innmind\OperatingSystem\Config as OSConfig;
 use Innmind\Server\Control\Server;
+use Innmind\HttpTransport\{
+    Transport,
+    Information,
+    Success,
+    Redirection,
+    ClientError,
+    ServerError,
+    ConnectionFailed,
+};
 use Innmind\TimeWarp\Halt;
+use Innmind\Http\{
+    Response,
+    Response\StatusCode,
+};
 use Innmind\TimeContinuum\Clock;
-use Innmind\Immutable\Attempt;
+use Innmind\Immutable\{
+    Attempt,
+    Either,
+};
 
 /**
  * @internal
@@ -26,6 +45,47 @@ final class Config
             )))
             ->useServerControl(Server::via(
                 static fn($command) => $processes->run($command),
+            ))
+            ->useHttpTransport(Transport::via(
+                static fn($request) => $network
+                    ->http($request)
+                    ->match(
+                        static fn($response) => match ($response->statusCode()->range()) {
+                            StatusCode\Range::informational => Either::left(new Information(
+                                $request,
+                                $response,
+                            )),
+                            StatusCode\Range::successful => Either::right(new Success(
+                                $request,
+                                $response,
+                            )),
+                            StatusCode\Range::redirection => Either::left(new Redirection(
+                                $request,
+                                $response,
+                            )),
+                            StatusCode\Range::clientError => Either::left(new ClientError(
+                                $request,
+                                $response,
+                            )),
+                            StatusCode\Range::serverError => Either::left(new ServerError(
+                                $request,
+                                $response,
+                            )),
+                        },
+                        static fn($e) => Either::left(match (true) {
+                            $e instanceof CouldNotResolveHost => new ConnectionFailed(
+                                $request,
+                                $e->getMessage(),
+                            ),
+                            default => new ServerError(
+                                $request,
+                                Response::of(
+                                    StatusCode::internalServerError,
+                                    $request->protocolVersion(),
+                                ),
+                            ),
+                        }),
+                    ),
             ));
     }
 }

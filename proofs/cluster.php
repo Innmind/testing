@@ -6,6 +6,7 @@ use Innmind\Testing\{
     Cluster,
 };
 use Innmind\Server\Control\Server\Command;
+use Innmind\HttpTransport\ConnectionFailed;
 use Innmind\Http\{
     Request,
     Response,
@@ -20,7 +21,11 @@ use Innmind\TimeContinuum\{
     Format,
     Offset,
 };
-use Innmind\Immutable\Attempt;
+use Innmind\Immutable\{
+    Attempt,
+    Sequence,
+    Str,
+};
 use Innmind\BlackBox\Set;
 use Fixtures\Innmind\TimeContinuum\PointInTime;
 
@@ -174,6 +179,218 @@ return static function() {
                 $start
                     ->changeOffset(Offset::utc())
                     ->format(Format::iso8601()),
+                $response->body()->toString(),
+            );
+        },
+    );
+
+    yield proof(
+        'Machine can make HTTP calls to another machine',
+        given(
+            Set::strings(),
+            Set::strings(),
+        ),
+        static function($assert, $input, $output) {
+            $remote = Machine::new('remote.dev')
+                ->listenHttp(
+                    static function($request) use ($assert, $input, $output) {
+                        $assert->same($input, $request->body()->toString());
+
+                        return Attempt::result(Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString($output),
+                        ));
+                    },
+                );
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::post,
+                            ProtocolVersion::v11,
+                            null,
+                            Content::ofString($input),
+                        ))
+                        ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
+                        ->map(static fn($success) => $success->response()),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->same(
+                $output,
+                $response->body()->toString(),
+            );
+        },
+    );
+
+    yield proof(
+        'Streamed HTTP responses are accessed only once over the network',
+        given(
+            Set::strings(),
+        ),
+        static function($assert, $output) {
+            $called = 0;
+            $remote = Machine::new('remote.dev')
+                ->listenHttp(
+                    static function($request) use ($output, &$called) {
+                        return Attempt::result(Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofChunks(Sequence::lazy(static function() use ($output, &$called) {
+                                ++$called;
+
+                                yield Str::of($output);
+                            })),
+                        ));
+                    },
+                );
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::get,
+                            ProtocolVersion::v11,
+                        ))
+                        ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
+                        ->map(static fn($success) => $success->response()->body())
+                        ->map(static fn($body) => Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString($body->toString().$body->toString()),
+                        )),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->same(1, $called);
+            $assert->same(
+                $output.$output,
+                $response->body()->toString(),
+            );
+        },
+    );
+
+    yield test(
+        'Machines do not use the same operating system instance',
+        static function($assert) {
+            $remote = Machine::new('remote.dev')
+                ->listenHttp(
+                    static fn($request, $os) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                        null,
+                        Content::ofString(\spl_object_hash($os)),
+                    )),
+                );
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::get,
+                            ProtocolVersion::v11,
+                        ))
+                        ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
+                        ->map(static fn($success) => $success->response()->body())
+                        ->map(static fn($body) => Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString(\spl_object_hash($os).'|'.$body->toString()),
+                        )),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap()
+                ->body()
+                ->toString();
+            [$local, $remote] = \explode('|', $response);
+
+            $assert
+                ->expected($local)
+                ->not()
+                ->same($remote);
+        },
+    );
+
+    yield test(
+        'Machine get an error when accessing unknown machine over HTTP',
+        static function($assert) {
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::get,
+                            ProtocolVersion::v11,
+                        ))
+                        ->match(
+                            static fn($success) => Attempt::result($success->response()),
+                            static fn($error) => match (true) {
+                                $error instanceof ConnectionFailed => Attempt::result(Response::of(
+                                    StatusCode::ok,
+                                    $request->protocolVersion(),
+                                    null,
+                                    Content::ofString($error->reason()),
+                                )),
+                                default => Attempt::error(new RuntimeException),
+                            },
+                        ),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->same(
+                'Could not resolve host: remote.dev',
                 $response->body()->toString(),
             );
         },

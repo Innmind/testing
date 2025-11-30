@@ -3,6 +3,7 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation;
 
+use Innmind\Testing\Exception\CouldNotResolveHost;
 use Innmind\Http\{
     Request,
     Response,
@@ -57,10 +58,12 @@ final class Network
      */
     public function http(Request $request): Attempt
     {
+        $host = $request->url()->authority()->host()->toString();
+
         return $this
             ->machines
-            ->get($request->url()->authority()->host()->toString())
-            ->attempt(static fn() => new \RuntimeException('Could not resolve host'))
+            ->get($host)
+            ->attempt(static fn() => new CouldNotResolveHost($host))
             ->flatMap(static fn($machine) => $machine->http($request));
     }
 }
