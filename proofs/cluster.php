@@ -4,6 +4,7 @@ declare(strict_types = 1);
 use Innmind\Testing\{
     Machine,
     Cluster,
+    Network,
 };
 use Innmind\Server\Control\Server\Command;
 use Innmind\HttpTransport\ConnectionFailed;
@@ -474,6 +475,69 @@ return static function() {
                 ->not()
                 ->same($remote);
             $assert->same($remote, $resynced);
+        },
+    );
+
+    yield proof(
+        'Network latencies',
+        given(
+            PointInTime::any(),
+            // Below the second of latency it's hard to assert it's correctly
+            // applied as the clock still advances. So doing time math at this
+            // level of precision regularly fails with an off by one error.
+            Set::integers()->between(1_000, 3_000),
+            Set::integers()->between(1_000, 3_000),
+        ),
+        static function($assert, $start, $in, $out) {
+            $remote = Machine::new('remote.dev')
+                ->listenHttp(
+                    static fn($request, $os) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                    )),
+                );
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => $os
+                        ->remote()
+                        ->http()(Request::of(
+                            Url::of('http://remote.dev/'),
+                            Method::get,
+                            ProtocolVersion::v11,
+                        ))
+                        ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
+                        ->map(static fn($success) => $success->response()->body())
+                        ->map(static fn($body) => Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString($os->clock()->now()->format(Format::iso8601())),
+                        )),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->startClockAt($start)
+                ->withNetworkLatency(Network\Latency::of($in, $out))
+                ->boot();
+
+            $now = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap()
+                ->body()
+                ->toString();
+
+            $assert->same(
+                $start
+                    ->changeOffset(Offset::utc())
+                    ->goForward(Period::millisecond($in + $in + $out)) // 2 $in as we make call local.dev over http
+                    ->format(Format::iso8601()),
+                $now,
+            );
         },
     );
 };

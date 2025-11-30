@@ -16,6 +16,7 @@ final class Cluster
     private function __construct(
         private ?PointInTime $start,
         private Set $machines,
+        private Network\Latency $latency,
     ) {
     }
 
@@ -25,7 +26,11 @@ final class Cluster
     #[\NoDiscard]
     public static function new(): self
     {
-        return new self(null, Set::of());
+        return new self(
+            null,
+            Set::of(),
+            Network\Latency::of(),
+        );
     }
 
     /**
@@ -37,6 +42,7 @@ final class Cluster
         return new self(
             $date,
             $this->machines,
+            $this->latency,
         );
     }
 
@@ -49,6 +55,20 @@ final class Cluster
         return new self(
             $this->start,
             ($this->machines)($machine),
+            $this->latency,
+        );
+    }
+
+    /**
+     * @psalm-mutation-free
+     */
+    #[\NoDiscard]
+    public function withNetworkLatency(Network\Latency $latency): self
+    {
+        return new self(
+            $this->start,
+            $this->machines,
+            $latency,
         );
     }
 
@@ -56,7 +76,7 @@ final class Cluster
     public function boot(): Simulation\Cluster
     {
         $ntp = Simulation\NTPServer::new($this->start);
-        $network = Simulation\Network::new($ntp);
+        $network = Simulation\Network::new($ntp, $this->latency);
         $_ = $this->machines->foreach(
             static fn($machine) => $machine->boot($network),
         );

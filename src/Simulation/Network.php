@@ -3,7 +3,10 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation;
 
-use Innmind\Testing\Exception\CouldNotResolveHost;
+use Innmind\Testing\{
+    Network\Latency,
+    Exception\CouldNotResolveHost,
+};
 use Innmind\Http\{
     Request,
     Response,
@@ -21,14 +24,16 @@ final class Network
     private function __construct(
         private Map $machines,
         private NTPServer $ntp,
+        private Network\Latency $latency,
     ) {
     }
 
-    public static function new(NTPServer $ntp): self
+    public static function new(NTPServer $ntp, Latency $latency): self
     {
         return new self(
             Map::of(),
             $ntp,
+            $latency->asState(),
         );
     }
 
@@ -58,12 +63,23 @@ final class Network
      */
     public function http(Request $request): Attempt
     {
+        ($this->latency)($this->ntp);
         $host = $request->url()->authority()->host()->toString();
 
         return $this
             ->machines
             ->get($host)
             ->attempt(static fn() => new CouldNotResolveHost($host))
-            ->flatMap(static fn($machine) => $machine->http($request));
+            ->flatMap(static fn($machine) => $machine->http($request))
+            ->map(function($response) {
+                ($this->latency)($this->ntp);
+
+                return $response;
+            })
+            ->mapError(function($error) {
+                ($this->latency)($this->ntp);
+
+                return $error;
+            });
     }
 }
