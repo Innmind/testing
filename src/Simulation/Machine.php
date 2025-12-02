@@ -12,6 +12,10 @@ use Innmind\OperatingSystem\{
     OperatingSystem,
     Config,
 };
+use Innmind\Server\Control\Server\{
+    Command,
+    Process,
+};
 use Innmind\Http\{
     ServerRequest,
     Request,
@@ -127,5 +131,11 @@ final class Machine
             ));
     }
 
-    // todo allow ssh
+    /**
+     * @return Attempt<Process>
+     */
+    public function run(Command $command): Attempt
+    {
+        return $this->processes->run($command);
+    }
 }

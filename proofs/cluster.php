@@ -5,6 +5,7 @@ use Innmind\Testing\{
     Machine,
     Cluster,
     Network,
+    Exception\CouldNotResolveHost,
 };
 use Innmind\Server\Control\Server\Command;
 use Innmind\HttpTransport\ConnectionFailed;
@@ -28,6 +29,7 @@ use Innmind\Immutable\{
     Attempt,
     Sequence,
     Str,
+    Monoid\Concat,
 };
 use Innmind\BlackBox\Set;
 use Fixtures\Innmind\TimeContinuum\PointInTime;
@@ -404,6 +406,24 @@ return static function() {
         },
     );
 
+    yield test(
+        'Cluster get an error when accessing unknown machine over SSH',
+        static function($assert) {
+            $cluster = Cluster::new()->boot();
+
+            $e = $cluster
+                ->ssh('local.dev')
+                ->match(
+                    static fn() => null,
+                    static fn($e) => $e,
+                );
+
+            $assert
+                ->object($e)
+                ->instance(CouldNotResolveHost::class);
+        },
+    );
+
     yield proof(
         'Time can drift between machines',
         given(
@@ -716,6 +736,58 @@ return static function() {
             $assert->same(
                 $key.$value,
                 $response->body()->toString(),
+            );
+        },
+    );
+
+    yield proof(
+        'Machine is accessible over ssh',
+        given(
+            PointInTime::any(),
+        ),
+        static function($assert, $start) {
+            $local = Machine::new('local.dev')
+                ->install(
+                    'foo',
+                    Machine\CLI::of(static function(
+                        $command,
+                        $builder,
+                        $os,
+                    ) use ($assert) {
+                        $assert->same(
+                            "foo 'display' '--option'",
+                            $command->toString(),
+                        );
+
+                        return $builder->success([[
+                            $os->clock()->now()->format(Format::iso8601()),
+                            'output',
+                        ]]);
+                    }),
+                );
+            $cluster = Cluster::new()
+                ->startClockAt($start)
+                ->add($local)
+                ->boot();
+
+            $output = $cluster
+                ->ssh('local.dev')
+                ->flatMap(static fn($run) => $run(
+                    Command::foreground('foo')
+                        ->withArgument('display')
+                        ->withOption('option'),
+                ))
+                ->unwrap()
+                ->output()
+                ->map(static fn($chunk) => $chunk->data())
+                ->fold(new Concat)
+                ->toString();
+
+            $assert->same(
+                $start
+                    ->changeOffset(Offset::utc())
+                    ->format(Format::iso8601()),
+                $output,
             );
         },
     );

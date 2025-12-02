@@ -7,6 +7,10 @@ use Innmind\Testing\{
     Network\Latency,
     Exception\CouldNotResolveHost,
 };
+use Innmind\Server\Control\Server\{
+    Command,
+    Process,
+};
 use Innmind\Http\{
     Request,
     Response,
@@ -81,5 +85,17 @@ final class Network
 
                 return $error;
             });
+    }
+
+    /**
+     * @return Attempt<callable(Command): Attempt<Process>>
+     */
+    public function ssh(string $host): Attempt
+    {
+        return $this
+            ->machines
+            ->get($host)
+            ->attempt(static fn() => new CouldNotResolveHost($host))
+            ->map(static fn($machine) => static fn(Command $command) => $machine->run($command));
     }
 }

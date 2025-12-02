@@ -3,6 +3,10 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation;
 
+use Innmind\Server\Control\Server\{
+    Command,
+    Process,
+};
 use Innmind\Http\{
     Request,
     Response,
@@ -29,5 +33,11 @@ final class Cluster
         return $this->network->http($request);
     }
 
-    // todo allow ssh
+    /**
+     * @return Attempt<callable(Command): Attempt<Process>>
+     */
+    public function ssh(string $host): Attempt
+    {
+        return $this->network->ssh($host);
+    }
 }
