@@ -4,7 +4,10 @@ declare(strict_types = 1);
 namespace Innmind\Testing;
 
 use Innmind\Testing\Machine\ProcessBuilder;
-use Innmind\OperatingSystem\OperatingSystem;
+use Innmind\OperatingSystem\{
+    OperatingSystem,
+    Config,
+};
 use Innmind\Server\Control\Server\Command;
 use Innmind\Http\{
     ServerRequest,
@@ -23,12 +26,14 @@ final class Machine
      * @param non-empty-list<string> $domains
      * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
      * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem): Attempt<Response>> $http
+     * @param \Closure(Config): Config $configureOS
      */
     private function __construct(
         private array $domains,
         private Map $executables,
         private Map $http,
         private Machine\Clock\Drift $drift,
+        private \Closure $configureOS,
     ) {
     }
 
@@ -46,6 +51,7 @@ final class Machine
             Map::of(),
             Map::of(),
             Machine\Clock\Drift::of(),
+            static fn(Config $config) => $config,
         );
     }
 
@@ -65,6 +71,7 @@ final class Machine
             ($this->executables)($executable, $builder),
             $this->http,
             $this->drift,
+            $this->configureOS,
         );
     }
 
@@ -84,6 +91,7 @@ final class Machine
             $this->executables,
             ($this->http)($port, $handle),
             $this->drift,
+            $this->configureOS,
         );
     }
 
@@ -98,6 +106,24 @@ final class Machine
             $this->executables,
             $this->http,
             $drift,
+            $this->configureOS,
+        );
+    }
+
+    /**
+     * @psalm-mutation-free
+     *
+     * @param callable(Config): Config $map
+     */
+    #[\NoDiscard]
+    public function configureOperatingSystem(callable $map): self
+    {
+        return new self(
+            $this->domains,
+            $this->executables,
+            $this->http,
+            $this->drift,
+            \Closure::fromCallable($map),
         );
     }
 
@@ -115,6 +141,7 @@ final class Machine
                 $this->executables,
                 $this->http,
                 $this->drift,
+                $this->configureOS,
             ),
         );
     }

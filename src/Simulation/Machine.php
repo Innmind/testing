@@ -7,7 +7,10 @@ use Innmind\Testing\Machine\{
     ProcessBuilder,
     Clock,
 };
-use Innmind\OperatingSystem\OperatingSystem;
+use Innmind\OperatingSystem\{
+    OperatingSystem,
+    Config,
+};
 use Innmind\Server\Control\Server\Command;
 use Innmind\Http\{
     ServerRequest,
@@ -37,6 +40,7 @@ final class Machine
     /**
      * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
      * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem): Attempt<Response>> $http
+     * @param \Closure(Config): Config $configureOS
      */
     #[\NoDiscard]
     public static function new(
@@ -44,16 +48,19 @@ final class Machine
         Map $executables,
         Map $http,
         Clock\Drift $drift,
+        \Closure $configureOS,
     ): self {
         $os = Machine\OS::new();
         $processes = Machine\Processes::new(
             $os,
             $executables,
         );
-        $os->boot(OperatingSystem::new(Machine\Config::of(
-            $network,
-            $processes,
-            $drift,
+        $os->boot(OperatingSystem::new($configureOS(
+            Machine\Config::of(
+                $network,
+                $processes,
+                $drift,
+            ),
         )));
 
         return new self(

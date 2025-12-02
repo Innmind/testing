@@ -540,4 +540,59 @@ return static function() {
             );
         },
     );
+
+    yield proof(
+        'Machine OS is configurable',
+        given(
+            // France was on UTC time for part of 20th century
+            PointInTime::after('2000-01-01'),
+        ),
+        static function($assert, $start) {
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $os) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                        null,
+                        Content::ofString(\sprintf(
+                            '%s|%s',
+                            $os->clock()->now()->format(Format::iso8601()),
+                            $os->clock()->now()->changeOffset(Offset::utc())->format(Format::iso8601()),
+                        )),
+                    )),
+                )
+                ->configureOperatingSystem(
+                    static fn($config) => $config->mapClock(
+                        static fn($clock) => $clock->switch(
+                            static fn($timezones) => $timezones->europe()->paris(),
+                        ),
+                    ),
+                );
+            $cluster = Cluster::new()
+                ->startClockAt($start)
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap()
+                ->body()
+                ->toString();
+            [$paris, $utc] = \explode('|', $response);
+
+            $assert
+                ->expected(
+                    $start
+                        ->changeOffset(Offset::utc())
+                        ->format(Format::iso8601()),
+                )
+                ->same($utc)
+                ->not()
+                ->same($paris);
+        },
+    );
 };
