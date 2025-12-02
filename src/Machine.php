@@ -128,7 +128,6 @@ final class Machine
     }
 
     // todo add environment variables
-    // todo add clock drift
     // todo map($this): self
     // todo add crontab ?
 
