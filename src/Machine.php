@@ -150,7 +150,18 @@ final class Machine
         );
     }
 
-    // todo map($this): self
+    /**
+     * @psalm-mutation-free
+     *
+     * @param callable(self): self $map
+     */
+    #[\NoDiscard]
+    public function map(callable $map): self
+    {
+        /** @psalm-suppress ImpureFunctionCall */
+        return $map($this);
+    }
+
     // todo add crontab ?
 
     public function boot(Simulation\Network $network): void
