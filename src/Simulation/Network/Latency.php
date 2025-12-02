@@ -15,7 +15,6 @@ final class Latency
      */
     private function __construct(
         private array $latencies,
-        private ?int $accumulated = null,
     ) {
     }
 
