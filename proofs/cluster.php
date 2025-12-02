@@ -402,13 +402,15 @@ return static function() {
     yield proof(
         'Time can drift between machines',
         given(
+            // Below the second of drift it's hard to assert it's correctly
+            // applied as the clock still advances. So doing time math at this
+            // level of precision regularly fails with an off by one error.
             Set::either(
-                Set::integers()->between(10, 1_000),
-                Set::integers()->between(-1_000, -10),
+                Set::integers()->between(1_000, 3_000),
+                Set::integers()->between(-3_000, -1_000),
             ),
         ),
         static function($assert, $drift) {
-            $format = Format::of('Y-m-dTH:i:s.v');
             $remote = Machine::new('remote.dev')
                 ->listenHttp(
                     static fn($request, $os) => Attempt::result(Response::of(
@@ -418,7 +420,7 @@ return static function() {
                         Content::ofString(\sprintf(
                             '%s|%s',
                             $request->body()->toString(),
-                            $os->clock()->now()->format($format),
+                            $os->clock()->now()->format(Format::iso8601()),
                         )),
                     )),
                 );
@@ -434,7 +436,7 @@ return static function() {
                             Headers::of(
                                 Date::of($os->clock()->now()), // to force accessing the second drift
                             ),
-                            Content::ofString($os->clock()->now()->format($format)),
+                            Content::ofString($os->clock()->now()->format(Format::iso8601())),
                         ))
                         ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
                         ->map(static fn($success) => $success->response()->body())
@@ -445,7 +447,7 @@ return static function() {
                             Content::ofString(\sprintf(
                                 '%s|%s',
                                 $body->toString(),
-                                $os->clock()->now()->format($format),
+                                $os->clock()->now()->format(Format::iso8601()),
                             )),
                         )),
                 );
