@@ -27,19 +27,21 @@ use Innmind\Immutable\{
 final class Machine
 {
     /**
-     * @param Map<?int, callable(ServerRequest, OperatingSystem): Attempt<Response>> $http
+     * @param Map<?int, callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response>> $http
+     * @param Map<string, string> $environment
      */
     private function __construct(
         private Machine\OS $os,
         private Machine\Processes $processes,
         private Map $http,
-        // private Map<string, string> $environment, todo
+        private Map $environment,
     ) {
     }
 
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
-     * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem): Attempt<Response>> $http
+     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
+     * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response>> $http
+     * @param Map<string, string> $environment
      * @param \Closure(Config): Config $configureOS
      */
     #[\NoDiscard]
@@ -47,6 +49,7 @@ final class Machine
         Network $network,
         Map $executables,
         Map $http,
+        Map $environment,
         Clock\Drift $drift,
         \Closure $configureOS,
     ): self {
@@ -54,6 +57,7 @@ final class Machine
         $processes = Machine\Processes::new(
             $os,
             $executables,
+            $environment,
         );
         $os->boot(OperatingSystem::new($configureOS(
             Machine\Config::of(
@@ -67,6 +71,7 @@ final class Machine
             $os,
             $processes,
             $http,
+            $environment,
         );
     }
 
@@ -104,7 +109,11 @@ final class Machine
             ->http
             ->get($value)
             ->attempt(static fn() => new \RuntimeException('Connection timeout')) // todo inject fake timeout in ntp server ?
-            ->flatMap(fn($http) => $http($serverRequest, $this->os->unwrap()))
+            ->flatMap(fn($http) => $http(
+                $serverRequest,
+                $this->os->unwrap(),
+                $this->environment,
+            ))
             ->map(static fn($response) => Response::of(
                 $response->statusCode(),
                 $response->protocolVersion(),

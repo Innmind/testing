@@ -17,22 +17,28 @@ use Innmind\Immutable\{
 final class Processes
 {
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
+     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
+     * @param Map<string, string> $environment
      * @param int<2, max> $lastPid
      */
     private function __construct(
         private OS $os,
         private Map $executables,
+        private Map $environment,
         private int $lastPid = 2,
     ) {
     }
 
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem): ProcessBuilder> $executables
+     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
+     * @param Map<string, string> $environment
      */
-    public static function new(OS $os, Map $executables): self
-    {
-        return new self($os, $executables);
+    public static function new(
+        OS $os,
+        Map $executables,
+        Map $environment,
+    ): self {
+        return new self($os, $executables, $environment);
     }
 
     /**
@@ -66,6 +72,7 @@ final class Processes
                 $command,
                 ProcessBuilder::new(++$this->lastPid),
                 $this->os->unwrap(),
+                $this->environment,
             )->build());
     }
 }

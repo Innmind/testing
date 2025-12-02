@@ -597,4 +597,119 @@ return static function() {
                 ->same($paris);
         },
     );
+
+    yield proof(
+        'HTTP app has access to machine environment variables',
+        given(
+            Set::strings(),
+            Set::strings(),
+        ),
+        static function($assert, $key, $value) {
+            $local = Machine::new('local.dev')
+                ->listenHttp(
+                    static fn($request, $_, $environment) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                        null,
+                        Content::ofString(\implode(
+                            '',
+                            $environment
+                                ->map(static fn($key, $value) => $key.$value)
+                                ->values()
+                                ->toList(),
+                        )),
+                    )),
+                )
+                ->withEnvironment($key, $value);
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->same(
+                $key.$value,
+                $response->body()->toString(),
+            );
+        },
+    );
+
+    yield proof(
+        'CLI app has access to machine environment variables',
+        given(
+            Set::strings(),
+            Set::strings(),
+        ),
+        static function($assert, $key, $value) {
+            $local = Machine::new('local.dev')
+                ->install(
+                    'foo',
+                    static function(
+                        $command,
+                        $builder,
+                        $_,
+                        $environment,
+                    ) use ($assert) {
+                        $assert->same(
+                            "foo 'display' '--option'",
+                            $command->toString(),
+                        );
+
+                        return $builder->success([[
+                            \implode(
+                                '',
+                                $environment
+                                    ->map(static fn($key, $value) => $key.$value)
+                                    ->values()
+                                    ->toList(),
+                            ),
+                            'output',
+                        ]]);
+                    },
+                )
+                ->listenHttp(
+                    static fn($request, $os) => Attempt::result(Response::of(
+                        StatusCode::ok,
+                        $request->protocolVersion(),
+                        null,
+                        Content::ofChunks(
+                            $os
+                                ->control()
+                                ->processes()
+                                ->execute(
+                                    Command::foreground('foo')
+                                        ->withArgument('display')
+                                        ->withOption('option'),
+                                )
+                                ->unwrap()
+                                ->output()
+                                ->map(static fn($chunk) => $chunk->data()),
+                        ),
+                    )),
+                )
+                ->withEnvironment($key, $value);
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->same(
+                $key.$value,
+                $response->body()->toString(),
+            );
+        },
+    );
 };
