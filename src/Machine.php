@@ -3,20 +3,8 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing;
 
-use Innmind\Testing\Machine\ProcessBuilder;
-use Innmind\OperatingSystem\{
-    OperatingSystem,
-    Config,
-};
-use Innmind\Server\Control\Server\Command;
-use Innmind\Http\{
-    ServerRequest,
-    Response,
-};
-use Innmind\Immutable\{
-    Attempt,
-    Map,
-};
+use Innmind\OperatingSystem\Config;
+use Innmind\Immutable\Map;
 
 final class Machine
 {
@@ -24,8 +12,8 @@ final class Machine
      * @psalm-mutation-free
      *
      * @param non-empty-list<string> $domains
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
-     * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response>> $http
+     * @param Map<non-empty-string, Machine\CLI> $executables
+     * @param Map<?int<1, max>, Machine\HTTP> $http
      * @param Map<string, string> $environment
      * @param \Closure(Config): Config $configureOS
      */
@@ -62,16 +50,15 @@ final class Machine
      * @psalm-mutation-free
      *
      * @param non-empty-string $executable
-     * @param callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder $builder
      */
     #[\NoDiscard]
     public function install(
         string $executable,
-        callable $builder,
+        Machine\CLI $app,
     ): self {
         return new self(
             $this->domains,
-            ($this->executables)($executable, $builder),
+            ($this->executables)($executable, $app),
             $this->http,
             $this->environment,
             $this->drift,
@@ -82,18 +69,17 @@ final class Machine
     /**
      * @psalm-mutation-free
      *
-     * @param callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response> $handle
      * @param ?int<1, max> $port
      */
     #[\NoDiscard]
-    public function listenHttp(
-        callable $handle,
+    public function listen(
+        Machine\HTTP $app,
         ?int $port = null,
     ): self {
         return new self(
             $this->domains,
             $this->executables,
-            ($this->http)($port, $handle),
+            ($this->http)($port, $app),
             $this->environment,
             $this->drift,
             $this->configureOS,

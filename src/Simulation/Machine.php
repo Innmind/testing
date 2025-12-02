@@ -4,14 +4,14 @@ declare(strict_types = 1);
 namespace Innmind\Testing\Simulation;
 
 use Innmind\Testing\Machine\{
-    ProcessBuilder,
     Clock,
+    CLI,
+    HTTP,
 };
 use Innmind\OperatingSystem\{
     OperatingSystem,
     Config,
 };
-use Innmind\Server\Control\Server\Command;
 use Innmind\Http\{
     ServerRequest,
     Request,
@@ -27,7 +27,7 @@ use Innmind\Immutable\{
 final class Machine
 {
     /**
-     * @param Map<?int, callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response>> $http
+     * @param Map<?int, HTTP> $http
      * @param Map<string, string> $environment
      */
     private function __construct(
@@ -39,8 +39,8 @@ final class Machine
     }
 
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
-     * @param Map<?int<1, max>, callable(ServerRequest, OperatingSystem, Map<string, string>): Attempt<Response>> $http
+     * @param Map<non-empty-string, CLI> $executables
+     * @param Map<?int<1, max>, HTTP> $http
      * @param Map<string, string> $environment
      * @param \Closure(Config): Config $configureOS
      */
@@ -109,7 +109,7 @@ final class Machine
             ->http
             ->get($value)
             ->attempt(static fn() => new \RuntimeException('Connection timeout')) // todo inject fake timeout in ntp server ?
-            ->flatMap(fn($http) => $http(
+            ->flatMap(fn($app) => $app(
                 $serverRequest,
                 $this->os->unwrap(),
                 $this->environment,

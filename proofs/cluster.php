@@ -40,13 +40,13 @@ return static function() {
         ),
         static function($assert, $start) {
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
                         Content::ofString($os->clock()->now()->format(Format::iso8601())),
-                    )),
+                    ))),
                 );
             $cluster = Cluster::new()
                 ->startClockAt($start)
@@ -78,8 +78,8 @@ return static function() {
         ),
         static function($assert, $start, $seconds) {
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->process()
                         ->halt(Period::second($seconds))
                         ->map(static fn() => Response::of(
@@ -88,6 +88,7 @@ return static function() {
                             null,
                             Content::ofString($os->clock()->now()->format(Format::iso8601())),
                         )),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->startClockAt($start)
@@ -127,7 +128,7 @@ return static function() {
             $local = Machine::new('local.dev')
                 ->install(
                     'foo',
-                    static function(
+                    Machine\CLI::of(static function(
                         $command,
                         $builder,
                         $os,
@@ -142,10 +143,10 @@ return static function() {
                             $os->clock()->now()->format(Format::iso8601()),
                             'output',
                         ]]);
-                    },
+                    }),
                 )
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
@@ -162,7 +163,7 @@ return static function() {
                                 ->output()
                                 ->map(static fn($chunk) => $chunk->data()),
                         ),
-                    )),
+                    ))),
                 );
             $cluster = Cluster::new()
                 ->startClockAt($start)
@@ -195,8 +196,8 @@ return static function() {
         ),
         static function($assert, $input, $output) {
             $remote = Machine::new('remote.dev')
-                ->listenHttp(
-                    static function($request) use ($assert, $input, $output) {
+                ->listen(
+                    Machine\HTTP::of(static function($request) use ($assert, $input, $output) {
                         $assert->same($input, $request->body()->toString());
 
                         return Attempt::result(Response::of(
@@ -205,11 +206,11 @@ return static function() {
                             null,
                             Content::ofString($output),
                         ));
-                    },
+                    }),
                 );
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -220,6 +221,7 @@ return static function() {
                         ))
                         ->attempt(static fn() => new RuntimeException('Failed to access remote server'))
                         ->map(static fn($success) => $success->response()),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -249,8 +251,8 @@ return static function() {
         static function($assert, $output) {
             $called = 0;
             $remote = Machine::new('remote.dev')
-                ->listenHttp(
-                    static function($request) use ($output, &$called) {
+                ->listen(
+                    Machine\HTTP::of(static function($request) use ($output, &$called) {
                         return Attempt::result(Response::of(
                             StatusCode::ok,
                             $request->protocolVersion(),
@@ -261,11 +263,11 @@ return static function() {
                                 yield Str::of($output);
                             })),
                         ));
-                    },
+                    }),
                 );
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -280,6 +282,7 @@ return static function() {
                             null,
                             Content::ofString($body->toString().$body->toString()),
                         )),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -306,17 +309,17 @@ return static function() {
         'Machines do not use the same operating system instance',
         static function($assert) {
             $remote = Machine::new('remote.dev')
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
                         Content::ofString(\spl_object_hash($os)),
-                    )),
+                    ))),
                 );
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -331,6 +334,7 @@ return static function() {
                             null,
                             Content::ofString(\spl_object_hash($os).'|'.$body->toString()),
                         )),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -359,8 +363,8 @@ return static function() {
         'Machine get an error when accessing unknown machine over HTTP',
         static function($assert) {
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -379,6 +383,7 @@ return static function() {
                                 default => Attempt::error(new RuntimeException),
                             },
                         ),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -412,8 +417,8 @@ return static function() {
         ),
         static function($assert, $drift) {
             $remote = Machine::new('remote.dev')
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
@@ -422,12 +427,12 @@ return static function() {
                             $request->body()->toString(),
                             $os->clock()->now()->format(Format::iso8601()),
                         )),
-                    )),
+                    ))),
                 );
             $local = Machine::new('local.dev')
                 ->driftClockBy(Machine\Clock\Drift::of(0, $drift))
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -450,6 +455,7 @@ return static function() {
                                 $os->clock()->now()->format(Format::iso8601()),
                             )),
                         )),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -492,15 +498,15 @@ return static function() {
         ),
         static function($assert, $start, $in, $out) {
             $remote = Machine::new('remote.dev')
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
-                    )),
+                    ))),
                 );
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => $os
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
                         ->remote()
                         ->http()(Request::of(
                             Url::of('http://remote.dev/'),
@@ -515,6 +521,7 @@ return static function() {
                             null,
                             Content::ofString($os->clock()->now()->format(Format::iso8601())),
                         )),
+                    ),
                 );
             $cluster = Cluster::new()
                 ->add($local)
@@ -551,8 +558,8 @@ return static function() {
         ),
         static function($assert, $start) {
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
@@ -561,7 +568,7 @@ return static function() {
                             $os->clock()->now()->format(Format::iso8601()),
                             $os->clock()->now()->changeOffset(Offset::utc())->format(Format::iso8601()),
                         )),
-                    )),
+                    ))),
                 )
                 ->configureOperatingSystem(
                     static fn($config) => $config->mapClock(
@@ -606,8 +613,8 @@ return static function() {
         ),
         static function($assert, $key, $value) {
             $local = Machine::new('local.dev')
-                ->listenHttp(
-                    static fn($request, $_, $environment) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $_, $environment) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
@@ -618,7 +625,7 @@ return static function() {
                                 ->values()
                                 ->toList(),
                         )),
-                    )),
+                    ))),
                 )
                 ->withEnvironment($key, $value);
             $cluster = Cluster::new()
@@ -650,7 +657,7 @@ return static function() {
             $local = Machine::new('local.dev')
                 ->install(
                     'foo',
-                    static function(
+                    Machine\CLI::of(static function(
                         $command,
                         $builder,
                         $_,
@@ -671,10 +678,10 @@ return static function() {
                             ),
                             'output',
                         ]]);
-                    },
+                    }),
                 )
-                ->listenHttp(
-                    static fn($request, $os) => Attempt::result(Response::of(
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
                         StatusCode::ok,
                         $request->protocolVersion(),
                         null,
@@ -691,7 +698,7 @@ return static function() {
                                 ->output()
                                 ->map(static fn($chunk) => $chunk->data()),
                         ),
-                    )),
+                    ))),
                 )
                 ->withEnvironment($key, $value);
             $cluster = Cluster::new()

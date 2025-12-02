@@ -3,8 +3,10 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation\Machine;
 
-use Innmind\Testing\Machine\ProcessBuilder;
-use Innmind\OperatingSystem\OperatingSystem;
+use Innmind\Testing\Machine\{
+    ProcessBuilder,
+    CLI,
+};
 use Innmind\Server\Control\Server\{
     Command,
     Process,
@@ -17,7 +19,7 @@ use Innmind\Immutable\{
 final class Processes
 {
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
+     * @param Map<non-empty-string, CLI> $executables
      * @param Map<string, string> $environment
      * @param int<2, max> $lastPid
      */
@@ -30,7 +32,7 @@ final class Processes
     }
 
     /**
-     * @param Map<non-empty-string, callable(Command, ProcessBuilder, OperatingSystem, Map<string, string>): ProcessBuilder> $executables
+     * @param Map<non-empty-string, CLI> $executables
      * @param Map<string, string> $environment
      */
     public static function new(
@@ -68,7 +70,7 @@ final class Processes
                     $executable,
                 ),
             ))
-            ->map(fn($builder) => $builder(
+            ->map(fn($app) => $app(
                 $command,
                 ProcessBuilder::new(++$this->lastPid),
                 $this->os->unwrap(),
