@@ -18,6 +18,7 @@
         "php": "~8.4",
         "innmind/foundation": "dev-next",
         "innmind/immutable": "dev-next",
+        "innmind/mutable": "dev-next",
         "innmind/http": "dev-next",
         "innmind/operating-system": "dev-next",
         "innmind/reflection": "dev-next",

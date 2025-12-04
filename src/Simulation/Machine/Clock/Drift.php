@@ -8,49 +8,35 @@ use Innmind\TimeContinuum\{
     PointInTime,
     Period,
 };
+use Innmind\Mutable\Ring;
 
 final class Drift
 {
     /**
      * @psalm-mutation-free
      *
-     * @param list<int> $drifts
+     * @param Ring<int> $drifts
      */
     private function __construct(
-        private array $drifts,
-        private ?int $accumulated = null,
+        private Ring $drifts,
+        private int $accumulated = 0,
     ) {
     }
 
     public function __invoke(PointInTime $now): PointInTime
     {
-        if (\count($this->drifts) === 0) {
-            return $now;
-        }
-
-        /** @var int|false */
-        $drift = \current($this->drifts);
-
-        if (!\is_int($drift)) {
-            $drift = \reset($this->drifts);
-        }
-
-        \next($this->drifts);
-
-        $this->accumulated = match ($this->accumulated) {
-            null => $drift,
-            default => $this->accumulated + $drift,
-        };
-
-        if ($this->accumulated === 0) {
-            return $now;
-        }
-
-        if ($this->accumulated > 0) {
-            return $now->goForward(Period::millisecond($this->accumulated));
-        }
-
-        return $now->goBack(Period::millisecond($this->accumulated * -1));
+        return $this
+            ->drifts
+            ->pull()
+            ->map(fn($drift) => $this->accumulated += $drift)
+            ->match(
+                static fn($period) => match (true) {
+                    $period === 0 => $now,
+                    $period > 0 => $now->goForward(Period::millisecond($period)),
+                    $period < 0 => $now->goBack(Period::millisecond($period * -1)),
+                },
+                static fn() => $now,
+            );
     }
 
     /**
@@ -60,7 +46,7 @@ final class Drift
      */
     public static function of(array $drifts): self
     {
-        return new self($drifts);
+        return new self(Ring::of(...$drifts));
     }
 
     /**
@@ -69,8 +55,8 @@ final class Drift
      */
     public function reset(Network $value): Network
     {
-        $this->accumulated = null;
-        \reset($this->drifts);
+        $this->accumulated = 0;
+        $this->drifts->reset();
 
         return $value;
     }
