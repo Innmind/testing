@@ -72,6 +72,18 @@ final class Cluster
         );
     }
 
+    /**
+     * @psalm-mutation-free
+     *
+     * @param callable(self): self $map
+     */
+    #[\NoDiscard]
+    public function map(callable $map): self
+    {
+        /** @psalm-suppress ImpureFunctionCall */
+        return $map($this);
+    }
+
     #[\NoDiscard]
     public function boot(): Simulation\Cluster
     {
