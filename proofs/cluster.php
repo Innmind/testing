@@ -791,4 +791,77 @@ return static function() {
             );
         },
     );
+
+    yield proof(
+        'Machine can execute processes on another machine over ssh',
+        given(
+            Set::strings(),
+        ),
+        static function($assert, $expected) {
+            $remote = Machine::new('remote.dev')
+                ->install(
+                    'bar',
+                    Machine\CLI::of(static function(
+                        $command,
+                        $builder,
+                    ) use ($assert, $expected) {
+                        $assert->same(
+                            "bar 'display' '--option'",
+                            $command->toString(),
+                        );
+
+                        return $builder->success([[
+                            $expected,
+                            'output',
+                        ]]);
+                    }),
+                );
+            $local = Machine::new('local.dev')
+                ->install(
+                    'foo',
+                    Machine\CLI::of(static function(
+                        $_,
+                        $builder,
+                        $os,
+                    ) use ($assert) {
+                        $output = $os
+                            ->remote()
+                            ->ssh(Url::of('ssh://watev@remote.dev/'))
+                            ->processes()
+                            ->execute(
+                                Command::foreground('bar')
+                                    ->withArgument('display')
+                                    ->withOption('option'),
+                            )
+                            ->unwrap()
+                            ->output()
+                            ->map(static fn($chunk) => [
+                                $chunk->data()->toString(),
+                                $chunk->type()->name,
+                            ])
+                            ->toList();
+
+                        return $builder->success($output);
+                    }),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->add($remote)
+                ->boot();
+
+            $output = $cluster
+                ->ssh('local.dev')
+                ->flatMap(static fn($run) => $run(Command::foreground('foo')))
+                ->unwrap()
+                ->output()
+                ->map(static fn($chunk) => $chunk->data())
+                ->fold(new Concat)
+                ->toString();
+
+            $assert->same(
+                $expected,
+                $output,
+            );
+        },
+    );
 };

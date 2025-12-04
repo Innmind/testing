@@ -5,11 +5,14 @@ namespace Innmind\Testing\Simulation\Machine;
 
 use Innmind\Testing\{
     Simulation\Network,
-    Machine\Clock\Drift,
+    Simulation\Machine\Clock\Drift,
     Exception\CouldNotResolveHost,
 };
 use Innmind\OperatingSystem\Config as OSConfig;
-use Innmind\Server\Control\Server;
+use Innmind\Server\Control\{
+    Server,
+    Server\Command,
+};
 use Innmind\HttpTransport\{
     Transport,
     Information,
@@ -40,8 +43,6 @@ final class Config
         Processes $processes,
         Drift $drift,
     ): OSConfig {
-        $drift = $drift->asState();
-
         return OSConfig::new()
             ->withClock(Clock::via(static fn() => $drift(
                 $network->ntp()->now(),
@@ -50,7 +51,13 @@ final class Config
                 $network->ntp()->advance($period),
             )))
             ->useServerControl(Server::via(
-                static fn($command) => $processes->run($command),
+                static fn($command) => match (true) {
+                    $command instanceof Command => $processes->run($command),
+                    default => $drift
+                        ->reset($network)
+                        ->ssh($command->host()->toString())
+                        ->flatMap(static fn($machine) => $machine->run($command->command())),
+                },
             ))
             ->useHttpTransport(Transport::via(
                 static fn($request) => $drift

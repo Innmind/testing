@@ -36,7 +36,9 @@ final class Machine
      */
     private function __construct(
         private Machine\OS $os,
+        private Network $network,
         private Machine\Processes $processes,
+        private Machine\Clock\Drift $drift,
         private Map $http,
         private Map $environment,
     ) {
@@ -57,6 +59,8 @@ final class Machine
         Clock\Drift $drift,
         \Closure $configureOS,
     ): self {
+        $drift = $drift->asState();
+
         $os = Machine\OS::new();
         $processes = Machine\Processes::new(
             $os,
@@ -73,7 +77,9 @@ final class Machine
 
         return new self(
             $os,
+            $network,
             $processes,
+            $drift,
             $http,
             $environment,
         );
@@ -134,8 +140,16 @@ final class Machine
     /**
      * @return Attempt<Process>
      */
-    public function run(Command $command): Attempt
+    public function run(Command|Command\OverSsh $command): Attempt
     {
+        if ($command instanceof Command\OverSsh) {
+            return $this
+                ->drift
+                ->reset($this->network)
+                ->ssh($command->host()->toString())
+                ->flatMap(static fn($machine) => $machine->run($command->command()));
+        }
+
         return $this->processes->run($command);
     }
 }

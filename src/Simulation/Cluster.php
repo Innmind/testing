@@ -38,6 +38,9 @@ final class Cluster
      */
     public function ssh(string $host): Attempt
     {
-        return $this->network->ssh($host);
+        return $this
+            ->network
+            ->ssh($host)
+            ->map(static fn($machine) => static fn(Command $command) => $machine->run($command));
     }
 }
