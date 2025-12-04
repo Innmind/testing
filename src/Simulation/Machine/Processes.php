@@ -11,6 +11,7 @@ use Innmind\Server\Control\Server\{
     Command,
     Process,
 };
+use Innmind\Filesystem\File\Content;
 use Innmind\Immutable\{
     Map,
     Attempt,
@@ -48,23 +49,64 @@ final class Processes
      */
     public function run(Command $command): Attempt
     {
-        // todo build proper api in package
+        // todo handle timeouts, by hijacking the Process::halt() to make sure
+        // we don't go over the threshold ? (but how ?)
+
+        return $this->dispatch($command->internal());
+    }
+
+    /**
+     * @return Attempt<Process>
+     */
+    private function dispatch(Command\Implementation $command): Attempt
+    {
+        if ($command instanceof Command\Definition) {
+            return $this->doRun($command);
+        }
+
+        if ($command instanceof Command\Pipe) {
+            return $this
+                ->dispatch($command->a())
+                ->map(
+                    static fn($process) => $process
+                        ->output()
+                        ->map(static fn($chunk) => $chunk->data()),
+                )
+                ->map(Content::ofChunks(...))
+                ->map(static fn($output) => $command->b()->withInput($output))
+                ->flatMap($this->dispatch(...));
+        }
+
+        throw new \LogicException(\sprintf(
+            'Unknown command implementation %s',
+            $command::class,
+        ));
+    }
+
+    /**
+     * @return Attempt<Process>
+     */
+    private function doRun(Command\Definition $command): Attempt
+    {
+        $executable = $command->executable();
         /**
+         * @psalm-suppress MixedAgument
          * @psalm-suppress PossiblyNullFunctionCall
-         * @psalm-suppress UndefinedThisPropertyFetch
-         * @psalm-suppress MixedReturnStatement
-         * @var non-empty-string
+         * @psalm-suppress InaccessibleMethod
+         * @var Command
          */
-        $executable = (\Closure::bind(
-            fn(): string => $this->executable,
-            $command,
+        $command = (\Closure::bind(
+            static fn(): Command => new Command($command),
+            null,
             Command::class,
         ))();
+
+        // todo handle output redirection
 
         return $this
             ->executables
             ->get($executable)
-            ->attempt(static fn() => new \RuntimeException( // todo return a failed process instead ?
+            ->attempt(static fn() => new \RuntimeException( // todo return a failed process with exit code 127 (zsh behaviour)
                 \sprintf(
                     'Failed to start %s command',
                     $executable,

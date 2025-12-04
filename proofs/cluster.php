@@ -864,4 +864,77 @@ return static function() {
             );
         },
     );
+
+    yield proof(
+        'Machine can execute piped commands',
+        given(
+            Set::strings(),
+            Set::strings(),
+            Set::strings(),
+        ),
+        static function($assert, $input, $intermediary, $expected) {
+            $local = Machine::new('local.dev')
+                ->install(
+                    'bar',
+                    Machine\CLI::of(static function(
+                        $command,
+                        $builder,
+                    ) use ($assert, $intermediary, $expected) {
+                        $assert->same(
+                            $intermediary,
+                            $command->input()->match(
+                                static fn($input) => $input->toString(),
+                                static fn() => null,
+                            ),
+                        );
+
+                        return $builder->success([[
+                            $expected,
+                            'output',
+                        ]]);
+                    }),
+                )
+                ->install(
+                    'foo',
+                    Machine\CLI::of(static function(
+                        $command,
+                        $builder,
+                    ) use ($assert, $input, $intermediary) {
+                        $assert->same(
+                            $input,
+                            $command->input()->match(
+                                static fn($input) => $input->toString(),
+                                static fn() => null,
+                            ),
+                        );
+
+                        return $builder->success([[
+                            $intermediary,
+                            'output',
+                        ]]);
+                    }),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $output = $cluster
+                ->ssh('local.dev')
+                ->flatMap(static fn($run) => $run(
+                    Command::foreground('foo')
+                        ->withInput(Content::ofString($input))
+                        ->pipe(Command::foreground('bar')),
+                ))
+                ->unwrap()
+                ->output()
+                ->map(static fn($chunk) => $chunk->data())
+                ->fold(new Concat)
+                ->toString();
+
+            $assert->same(
+                $expected,
+                $output,
+            );
+        },
+    );
 };
