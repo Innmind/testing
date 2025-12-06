@@ -3,10 +3,11 @@ declare(strict_types = 1);
 
 namespace Innmind\Testing\Simulation;
 
-use Innmind\Testing\Machine\{
-    Clock,
-    CLI,
-    HTTP,
+use Innmind\Testing\{
+    Machine\Clock,
+    Machine\CLI,
+    Machine\HTTP,
+    Exception\ConnectionTimeout,
 };
 use Innmind\OperatingSystem\{
     OperatingSystem,
@@ -124,7 +125,7 @@ final class Machine
         return $this
             ->http
             ->get($value)
-            ->attempt(static fn() => new \RuntimeException('Connection timeout')) // todo inject fake timeout in ntp server ?
+            ->attempt(static fn() => new ConnectionTimeout) // todo inject fake timeout in ntp server ?
             ->flatMap(fn($app) => $app(
                 $serverRequest,
                 $this->os->unwrap(),

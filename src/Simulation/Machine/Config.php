@@ -7,6 +7,7 @@ use Innmind\Testing\{
     Simulation\Network,
     Simulation\Machine\Clock\Drift,
     Exception\CouldNotResolveHost,
+    Exception\ConnectionTimeout,
 };
 use Innmind\OperatingSystem\Config as OSConfig;
 use Innmind\Server\Control\{
@@ -21,6 +22,7 @@ use Innmind\HttpTransport\{
     ClientError,
     ServerError,
     ConnectionFailed,
+    Failure,
 };
 use Innmind\TimeWarp\Halt;
 use Innmind\Http\{
@@ -94,6 +96,10 @@ final class Config
                             $e instanceof CouldNotResolveHost => new ConnectionFailed(
                                 $request,
                                 $e->getMessage(),
+                            ),
+                            $e instanceof ConnectionTimeout => new Failure(
+                                $request,
+                                'Connection timeout',
                             ),
                             default => new ServerError(
                                 $request,
