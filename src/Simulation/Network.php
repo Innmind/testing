@@ -46,13 +46,10 @@ final class Network
 
     /**
      * @param non-empty-list<string> $domains
-     * @param callable(): Machine $boot
      */
     #[\NoDiscard]
-    public function with(array $domains, callable $boot): void
+    public function with(array $domains, Machine $machine): void
     {
-        $machine = $boot();
-
         foreach ($domains as $domain) {
             $this->machines = ($this->machines)(
                 $domain,

@@ -157,7 +157,7 @@ final class Machine
     {
         $network->with(
             $this->domains,
-            fn() => Simulation\Machine::new(
+            Simulation\Machine::new(
                 $network,
                 $this->executables,
                 $this->http,
