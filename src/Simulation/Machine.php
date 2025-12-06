@@ -24,6 +24,7 @@ use Innmind\Http\{
 };
 use Innmind\Filesystem\File\Content;
 use Innmind\Url\Authority\Port;
+use Innmind\TimeContinuum\Period;
 use Innmind\Immutable\{
     Map,
     Attempt,
@@ -125,7 +126,17 @@ final class Machine
         return $this
             ->http
             ->get($value)
-            ->attempt(static fn() => new ConnectionTimeout) // todo inject fake timeout in ntp server ?
+            ->attempt(
+                fn() => $this
+                    ->os
+                    ->unwrap()
+                    ->process()
+                    ->halt(Period::minute(1)) // todo make this configurable ?
+                    ->match(
+                        static fn() => new ConnectionTimeout,
+                        static fn($e) => $e,
+                    ),
+            )
             ->flatMap(fn($app) => $app(
                 $serverRequest,
                 $this->os->unwrap(),
