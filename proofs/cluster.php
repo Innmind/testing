@@ -626,6 +626,7 @@ return static function() {
             PointInTime::after('2000-01-01'),
         ),
         static function($assert, $start) {
+            $start = $start->goBack(Period::millisecond($start->millisecond()->toInt()));
             $local = Machine::new('local.dev')
                 ->listen(
                     Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
