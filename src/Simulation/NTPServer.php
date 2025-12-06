@@ -45,7 +45,7 @@ final class NTPServer
 
     /**
      * Either because a machine halted a process or a network call was made and
-     * introduce a latency between machines
+     * introduced a latency between machines
      */
     #[\NoDiscard]
     public function advance(Period $period): SideEffect
