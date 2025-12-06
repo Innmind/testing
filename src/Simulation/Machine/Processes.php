@@ -112,21 +112,24 @@ final class Processes
         ))();
 
         // todo handle output redirection
+        // todo add fault injection to simulate inability to spawn a process
+        // todo build a shell abstraction to allow to change the behaviour ?
 
-        return $this
+        $process = $this
             ->executables
             ->get($executable)
-            ->attempt(static fn() => new \RuntimeException( // todo return a failed process with exit code 127 (zsh behaviour)
-                \sprintf(
-                    'Failed to start %s command',
-                    $executable,
-                ),
-            ))
-            ->map(fn($app) => $app(
-                $command,
-                ProcessBuilder::new(++$this->lastPid),
-                $this->os->unwrap(),
-                $this->environment,
-            )->build());
+            ->match(
+                fn($app) => $app(
+                    $command,
+                    ProcessBuilder::new(++$this->lastPid),
+                    $this->os->unwrap(),
+                    $this->environment,
+                )->build(),
+                fn() => ProcessBuilder::new(++$this->lastPid) // zsh behaviour
+                    ->failed(127)
+                    ->build(),
+            );
+
+        return Attempt::result($process);
     }
 }
