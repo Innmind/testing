@@ -10,6 +10,9 @@ use Innmind\TimeContinuum\{
 };
 use Innmind\Immutable\SideEffect;
 
+/**
+ * @internal
+ */
 final class Clock
 {
     /**
@@ -24,8 +27,11 @@ final class Clock
     }
 
     /**
+     * @internal
+     *
      * @param ?int<2, 10> $clockSpeed
      */
+    #[\NoDiscard]
     public static function of(
         RealClock $clock,
         ?PointInTime $now,
@@ -52,6 +58,7 @@ final class Clock
         );
     }
 
+    #[\NoDiscard]
     public function now(): PointInTime
     {
         $now = ($this->delta)($this->clock->now());
@@ -63,6 +70,7 @@ final class Clock
         return ($this->speed)($now);
     }
 
+    #[\NoDiscard]
     public function advance(Period $period): SideEffect
     {
         $this->advance = $this->advance?->add($period) ?? $period;

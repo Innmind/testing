@@ -106,6 +106,9 @@ final class Cluster
         return $map($this);
     }
 
+    /**
+     * @internal
+     */
     #[\NoDiscard]
     public function boot(): Simulation\Cluster
     {

@@ -38,6 +38,10 @@ use Innmind\Immutable\{
  */
 final class Config
 {
+    /**
+     * @internal
+     */
+    #[\NoDiscard]
     public static function of(
         Network $network,
         Processes $processes,

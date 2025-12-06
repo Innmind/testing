@@ -24,11 +24,16 @@ final class Drift
      * @psalm-pure
      * @no-named-arguments
      */
+    #[\NoDiscard]
     public static function of(int ...$drifts): self
     {
         return new self($drifts);
     }
 
+    /**
+     * @internal
+     */
+    #[\NoDiscard]
     public function asState(): Clock\Drift
     {
         return Clock\Drift::of($this->drifts);

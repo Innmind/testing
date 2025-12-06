@@ -10,6 +10,9 @@ use Innmind\TimeContinuum\{
 };
 use Innmind\Immutable\SideEffect;
 
+/**
+ * @internal
+ */
 final class NTPServer
 {
     private function __construct(
@@ -18,8 +21,11 @@ final class NTPServer
     }
 
     /**
+     * @internal
+     *
      * @param ?int<2, 10> $clockSpeed
      */
+    #[\NoDiscard]
     public static function new(
         ?PointInTime $start,
         ?int $clockSpeed,
@@ -31,6 +37,7 @@ final class NTPServer
         ));
     }
 
+    #[\NoDiscard]
     public function now(): PointInTime
     {
         return $this->clock->now();
@@ -40,6 +47,7 @@ final class NTPServer
      * Either because a machine halted a process or a network call was made and
      * introduce a latency between machines
      */
+    #[\NoDiscard]
     public function advance(Period $period): SideEffect
     {
         return $this->clock->advance($period);

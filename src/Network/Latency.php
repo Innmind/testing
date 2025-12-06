@@ -26,11 +26,16 @@ final class Latency
      *
      * @param int<0, max> ...$latencies
      */
+    #[\NoDiscard]
     public static function of(int ...$latencies): self
     {
         return new self($latencies);
     }
 
+    /**
+     * @internal
+     */
+    #[\NoDiscard]
     public function asState(): Network\Latency
     {
         return Network\Latency::of($this->latencies);

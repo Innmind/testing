@@ -16,6 +16,9 @@ use Innmind\Immutable\{
     Attempt,
 };
 
+/**
+ * @internal
+ */
 final class Network
 {
     /**
@@ -28,6 +31,10 @@ final class Network
     ) {
     }
 
+    /**
+     * @internal
+     */
+    #[\NoDiscard]
     public static function new(NTPServer $ntp, Latency $latency): self
     {
         return new self(
@@ -41,6 +48,7 @@ final class Network
      * @param non-empty-list<string> $domains
      * @param callable(): Machine $boot
      */
+    #[\NoDiscard]
     public function with(array $domains, callable $boot): void
     {
         $machine = $boot();
@@ -53,6 +61,7 @@ final class Network
         }
     }
 
+    #[\NoDiscard]
     public function ntp(): NTPServer
     {
         return $this->ntp;
@@ -61,6 +70,7 @@ final class Network
     /**
      * @return Attempt<Response>
      */
+    #[\NoDiscard]
     public function http(Request $request): Attempt
     {
         ($this->latency)($this->ntp);
@@ -86,6 +96,7 @@ final class Network
     /**
      * @return Attempt<Machine>
      */
+    #[\NoDiscard]
     public function ssh(string $host): Attempt
     {
         return $this

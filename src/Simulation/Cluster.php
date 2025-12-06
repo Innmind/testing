@@ -20,6 +20,10 @@ final class Cluster
     ) {
     }
 
+    /**
+     * @internal
+     */
+    #[\NoDiscard]
     public static function new(Network $network): self
     {
         return new self($network);
@@ -28,6 +32,7 @@ final class Cluster
     /**
      * @return Attempt<Response>
      */
+    #[\NoDiscard]
     public function http(Request $request): Attempt
     {
         return $this->network->http($request);
@@ -36,6 +41,7 @@ final class Cluster
     /**
      * @return Attempt<callable(Command): Attempt<Process>>
      */
+    #[\NoDiscard]
     public function ssh(string $host): Attempt
     {
         return $this

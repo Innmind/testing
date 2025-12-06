@@ -150,6 +150,9 @@ final class Machine
 
     // todo add crontab ?
 
+    /**
+     * @internal
+     */
     public function boot(Simulation\Network $network): void
     {
         $network->with(

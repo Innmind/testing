@@ -17,9 +17,14 @@ use Innmind\Immutable\{
     Attempt,
 };
 
+/**
+ * @internal
+ */
 final class Processes
 {
     /**
+     * @psalm-mutation-free
+     *
      * @param Map<non-empty-string, CLI> $executables
      * @param Map<string, string> $environment
      * @param int<2, max> $lastPid
@@ -33,9 +38,13 @@ final class Processes
     }
 
     /**
+     * @psalm-pure
+     * @internal
+     *
      * @param Map<non-empty-string, CLI> $executables
      * @param Map<string, string> $environment
      */
+    #[\NoDiscard]
     public static function new(
         OS $os,
         Map $executables,
@@ -47,6 +56,7 @@ final class Processes
     /**
      * @return Attempt<Process>
      */
+    #[\NoDiscard]
     public function run(Command $command): Attempt
     {
         // todo handle timeouts, by hijacking the Process::halt() to make sure

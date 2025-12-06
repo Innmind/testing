@@ -5,9 +5,14 @@ namespace Innmind\Testing\Simulation\NTPServer\Clock;
 
 use Innmind\TimeContinuum\PointInTime;
 
+/**
+ * @internal
+ */
 final class Speed
 {
     /**
+     * @psalm-mutation-free
+     *
      * @param ?int<2, 10> $multiplier
      */
     private function __construct(
@@ -16,6 +21,7 @@ final class Speed
     ) {
     }
 
+    #[\NoDiscard]
     public function __invoke(PointInTime $now): PointInTime
     {
         if (\is_null($this->multiplier)) {
@@ -33,8 +39,12 @@ final class Speed
     }
 
     /**
+     * @psalm-pure
+     * @internal
+     *
      * @param ?int<2, 10> $multiplier
      */
+    #[\NoDiscard]
     public static function of(PointInTime $previous, ?int $multiplier): self
     {
         return new self($previous, $multiplier);

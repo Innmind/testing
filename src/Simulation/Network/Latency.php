@@ -7,6 +7,9 @@ use Innmind\Testing\Simulation\NTPServer;
 use Innmind\TimeContinuum\Period;
 use Innmind\Mutable\Ring;
 
+/**
+ * @internal
+ */
 final class Latency
 {
     /**
@@ -33,9 +36,11 @@ final class Latency
 
     /**
      * @psalm-pure
+     * @internal
      *
      * @param list<int<0, max>> $latencies
      */
+    #[\NoDiscard]
     public static function of(array $latencies): self
     {
         return new self(Ring::of(...$latencies));

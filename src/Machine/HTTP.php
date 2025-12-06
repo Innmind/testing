@@ -26,10 +26,13 @@ final class HTTP
     }
 
     /**
+     * @internal
+     *
      * @param Map<string, string> $environment
      *
      * @return Attempt<Response>
      */
+    #[\NoDiscard]
     public function __invoke(
         ServerRequest $request,
         OperatingSystem $os,

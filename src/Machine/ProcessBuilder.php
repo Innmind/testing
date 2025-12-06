@@ -19,9 +19,14 @@ use Innmind\Immutable\{
     Str,
 };
 
+/**
+ * @todo move back to innmind/server-control
+ */
 final class ProcessBuilder
 {
     /**
+     * @psalm-mutation-free
+     *
      * @param int<2, max> $pid
      */
     private function __construct(
@@ -32,15 +37,20 @@ final class ProcessBuilder
 
     /**
      * @internal
+     * @psalm-pure
      *
      * @param int<2, max> $pid
      */
+    #[\NoDiscard]
     public static function new(int $pid): self
     {
+        /** @psalm-suppress ImpureMethodCall todo remove this line when in innmind/server-control */
         return new self($pid, new Success(Sequence::of()));
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @param Sequence<Chunk>|list<array{string, 'output'|'error'}> $output
      */
     #[\NoDiscard]
@@ -53,6 +63,8 @@ final class ProcessBuilder
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @param Sequence<Chunk>|list<array{string, 'output'|'error'}> $output
      */
     #[\NoDiscard]
@@ -65,6 +77,8 @@ final class ProcessBuilder
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @param Sequence<Chunk>|list<array{string, 'output'|'error'}> $output
      */
     #[\NoDiscard]
@@ -77,6 +91,8 @@ final class ProcessBuilder
     }
 
     /**
+     * @psalm-mutation-free
+     *
      * @param int<1, 255> $exitCode
      * @param Sequence<Chunk>|list<array{string, 'output'|'error'}> $output
      */
@@ -116,6 +132,8 @@ final class ProcessBuilder
     }
 
     /**
+     * @psalm-pure
+     *
      * @param Sequence<Chunk>|list<array{string, 'output'|'error'}> $output
      *
      * @return Sequence<Chunk>

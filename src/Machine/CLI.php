@@ -20,8 +20,11 @@ final class CLI
     }
 
     /**
+     * @internal
+     *
      * @param Map<string, string> $environment
      */
+    #[\NoDiscard]
     public function __invoke(
         Command $command,
         ProcessBuilder $builder,

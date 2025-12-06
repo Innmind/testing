@@ -10,6 +10,9 @@ use Innmind\TimeContinuum\{
 };
 use Innmind\Mutable\Ring;
 
+/**
+ * @internal
+ */
 final class Drift
 {
     /**
@@ -23,6 +26,7 @@ final class Drift
     ) {
     }
 
+    #[\NoDiscard]
     public function __invoke(PointInTime $now): PointInTime
     {
         return $this
@@ -41,6 +45,7 @@ final class Drift
 
     /**
      * @psalm-pure
+     * @internal
      *
      * @param list<int> $drifts
      */

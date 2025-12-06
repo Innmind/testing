@@ -28,6 +28,9 @@ use Innmind\Immutable\{
     Attempt,
 };
 
+/**
+ * @internal
+ */
 final class Machine
 {
     /**
@@ -45,6 +48,8 @@ final class Machine
     }
 
     /**
+     * @internal
+     *
      * @param Map<non-empty-string, CLI> $executables
      * @param Map<?int<1, max>, HTTP> $http
      * @param Map<string, string> $environment
@@ -88,6 +93,7 @@ final class Machine
     /**
      * @return Attempt<Response>
      */
+    #[\NoDiscard]
     public function http(Request $request): Attempt
     {
         $port = $request->url()->authority()->port();
@@ -140,6 +146,7 @@ final class Machine
     /**
      * @return Attempt<Process>
      */
+    #[\NoDiscard]
     public function run(Command|Command\OverSsh $command): Attempt
     {
         if ($command instanceof Command\OverSsh) {
