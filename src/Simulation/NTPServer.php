@@ -17,11 +17,17 @@ final class NTPServer
     ) {
     }
 
-    public static function new(?PointInTime $start): self
-    {
+    /**
+     * @param ?int<2, 10> $clockSpeed
+     */
+    public static function new(
+        ?PointInTime $start,
+        ?int $clockSpeed,
+    ): self {
         return new self(NTPServer\Clock::of(
             RealClock::live(),
             $start,
+            $clockSpeed,
         ));
     }
 

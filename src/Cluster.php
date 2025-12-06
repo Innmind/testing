@@ -12,11 +12,13 @@ final class Cluster
      * @psalm-mutation-free
      *
      * @param Set<Machine> $machines
+     * @param ?int<2, 10> $clockSpeed
      */
     private function __construct(
         private ?PointInTime $start,
         private Set $machines,
         private Network\Latency $latency,
+        private ?int $clockSpeed,
     ) {
     }
 
@@ -30,6 +32,7 @@ final class Cluster
             null,
             Set::of(),
             Network\Latency::of(),
+            null,
         );
     }
 
@@ -43,6 +46,23 @@ final class Cluster
             $date,
             $this->machines,
             $this->latency,
+            $this->clockSpeed,
+        );
+    }
+
+    /**
+     * @psalm-mutation-free
+     *
+     * @param int<2, 10> $speed
+     */
+    #[\NoDiscard]
+    public function speedUpTimeBy(int $speed): self
+    {
+        return new self(
+            $this->start,
+            $this->machines,
+            $this->latency,
+            $speed,
         );
     }
 
@@ -56,6 +76,7 @@ final class Cluster
             $this->start,
             ($this->machines)($machine),
             $this->latency,
+            $this->clockSpeed,
         );
     }
 
@@ -69,6 +90,7 @@ final class Cluster
             $this->start,
             $this->machines,
             $latency,
+            $this->clockSpeed,
         );
     }
 
@@ -87,7 +109,10 @@ final class Cluster
     #[\NoDiscard]
     public function boot(): Simulation\Cluster
     {
-        $ntp = Simulation\NTPServer::new($this->start);
+        $ntp = Simulation\NTPServer::new(
+            $this->start,
+            $this->clockSpeed,
+        );
         $network = Simulation\Network::new($ntp, $this->latency);
         $_ = $this->machines->foreach(
             static fn($machine) => $machine->boot($network),

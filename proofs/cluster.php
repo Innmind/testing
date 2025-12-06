@@ -121,6 +121,55 @@ return static function() {
     );
 
     yield proof(
+        'Cluster time can be sped up',
+        given(
+            PointInTime::any(),
+            Set::integers()->between(2, 10),
+        ),
+        static function($assert, $start, $speed) {
+            $local = Machine::new('local.dev')
+                ->listen(
+                    Machine\HTTP::of(static fn($request, $os) => $os
+                        ->process()
+                        ->halt(Period::second(1))
+                        ->map(static fn() => Response::of(
+                            StatusCode::ok,
+                            $request->protocolVersion(),
+                            null,
+                            Content::ofString($os->clock()->now()->format(Format::iso8601())),
+                        )),
+                    ),
+                );
+            $cluster = Cluster::new()
+                ->startClockAt($start)
+                ->speedUpTimeBy($speed)
+                ->add($local)
+                ->boot();
+
+            $assert
+                ->time(static function() use ($assert, $cluster, $start, $speed) {
+                    $response = $cluster
+                        ->http(Request::of(
+                            Url::of('http://local.dev/'),
+                            Method::get,
+                            ProtocolVersion::v11,
+                        ))
+                        ->unwrap();
+
+                    $assert->same(
+                        $start
+                            ->changeOffset(Offset::utc())
+                            ->goForward(Period::second($speed))
+                            ->format(Format::iso8601()),
+                        $response->body()->toString(),
+                    );
+                })
+                ->inLessThan()
+                ->seconds(1);
+        },
+    );
+
+    yield proof(
         'HTTP app can execute simulated process on the same machine',
         given(
             PointInTime::any(),

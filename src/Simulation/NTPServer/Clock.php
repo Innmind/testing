@@ -19,14 +19,20 @@ final class Clock
         private RealClock $clock,
         private \Closure $delta,
         private ?Period $advance,
+        private Clock\Speed $speed,
     ) {
     }
 
+    /**
+     * @param ?int<2, 10> $clockSpeed
+     */
     public static function of(
         RealClock $clock,
         ?PointInTime $now,
+        ?int $clockSpeed,
     ): self {
         $realNow = $clock->now();
+        $speed = Clock\Speed::of($now ?? $realNow, $clockSpeed);
 
         if (\is_null($now)) {
             $move = static fn(PointInTime $now): PointInTime => $now;
@@ -42,6 +48,7 @@ final class Clock
             $clock,
             $move,
             null,
+            $speed,
         );
     }
 
@@ -53,7 +60,7 @@ final class Clock
             $now = $now->goForward($this->advance);
         }
 
-        return $now;
+        return ($this->speed)($now);
     }
 
     public function advance(Period $period): SideEffect
