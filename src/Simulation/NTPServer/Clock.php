@@ -67,6 +67,10 @@ final class Clock
             $now = $now->goForward($this->advance);
         }
 
+        // Not sure this is correct or be applied before applying `$this->advance`
+        // as this means that when a process wait for 1 second it will advance
+        // by 2. This could lead to unexpected behaviour such as when waiting
+        // for timeouts.
         return ($this->speed)($now);
     }
 
