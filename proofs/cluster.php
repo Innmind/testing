@@ -35,10 +35,14 @@ use Innmind\BlackBox\Set;
 use Fixtures\Innmind\TimeContinuum\PointInTime;
 
 return static function() {
+    $safe = static fn($point) => $point->goBack(
+        Period::millisecond($point->millisecond()->toInt()),
+    );
+
     yield proof(
         'Cluster time is specifiable',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
         ),
         static function($assert, $start) {
             $local = Machine::new('local.dev')
@@ -75,7 +79,7 @@ return static function() {
     yield proof(
         'Cluster time can be fast forwarded',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
             Set::integers()->between(1, 1_000),
         ),
         static function($assert, $start, $seconds) {
@@ -123,7 +127,7 @@ return static function() {
     yield proof(
         'Cluster time can be sped up',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
             Set::integers()->between(2, 10),
         ),
         static function($assert, $start, $speed) {
@@ -172,7 +176,7 @@ return static function() {
     yield proof(
         'HTTP app can execute simulated process on the same machine',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
         ),
         static function($assert, $start) {
             $called = false;
@@ -558,7 +562,7 @@ return static function() {
     yield proof(
         'Network latencies',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
             // Below the second of latency it's hard to assert it's correctly
             // applied as the clock still advances. So doing time math at this
             // level of precision regularly fails with an off by one error.
@@ -623,10 +627,9 @@ return static function() {
         'Machine OS is configurable',
         given(
             // France was on UTC time for part of 20th century
-            PointInTime::after('2000-01-01'),
+            PointInTime::after('2000-01-01')->map($safe),
         ),
         static function($assert, $start) {
-            $start = $start->goBack(Period::millisecond($start->millisecond()->toInt()));
             $local = Machine::new('local.dev')
                 ->listen(
                     Machine\HTTP::of(static fn($request, $os) => Attempt::result(Response::of(
@@ -793,7 +796,7 @@ return static function() {
     yield proof(
         'Machine is accessible over ssh',
         given(
-            PointInTime::any(),
+            PointInTime::any()->map($safe),
         ),
         static function($assert, $start) {
             $local = Machine::new('local.dev')
