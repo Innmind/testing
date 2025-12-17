@@ -29,6 +29,14 @@ use Innmind\Http\{
     Response,
     Response\StatusCode,
 };
+use Innmind\Filesystem\{
+    Adapter,
+    CaseSensitivity,
+};
+use Innmind\IO\{
+    IO,
+    Simulation\Disk,
+};
 use Innmind\TimeContinuum\Clock;
 use Innmind\Immutable\{
     Attempt,
@@ -49,6 +57,8 @@ final class Config
         Processes $processes,
         Drift $drift,
     ): OSConfig {
+        $disk = Disk::new();
+
         return OSConfig::new()
             ->withClock(Clock::via(static fn() => $drift(
                 $network->ntp()->now(),
@@ -110,6 +120,16 @@ final class Config
                             ),
                         }),
                     ),
-            ));
+            ))
+            ->mountFilesystemVia(
+                static fn($path, $config) => Adapter::mount(
+                    $path,
+                    CaseSensitivity::sensitive,
+                    IO::simulation(
+                        $config->io(),
+                        $disk,
+                    ),
+                ),
+            );
     }
 }

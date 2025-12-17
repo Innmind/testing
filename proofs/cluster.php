@@ -7,7 +7,10 @@ use Innmind\Testing\{
     Network,
     Exception\CouldNotResolveHost,
 };
-use Innmind\Server\Control\Server\Command;
+use Innmind\Server\Control\Server\{
+    Command,
+    Process\Output,
+};
 use Innmind\HttpTransport\ConnectionFailed;
 use Innmind\Http\{
     Request,
@@ -18,8 +21,14 @@ use Innmind\Http\{
     Headers,
     Header\Date,
 };
-use Innmind\Filesystem\File\Content;
-use Innmind\Url\Url;
+use Innmind\Filesystem\{
+    File\Content,
+    Recover,
+};
+use Innmind\Url\{
+    Url,
+    Path,
+};
 use Innmind\TimeContinuum\{
     Period,
     Format,
@@ -32,6 +41,7 @@ use Innmind\Immutable\{
     Monoid\Concat,
 };
 use Innmind\BlackBox\Set;
+use Fixtures\Innmind\Filesystem\File;
 use Fixtures\Innmind\TimeContinuum\PointInTime;
 
 return static function() {
@@ -988,6 +998,141 @@ return static function() {
                 $expected,
                 $output,
             );
+        },
+    );
+
+    yield proof(
+        'Machine filesystem is accessible across apps',
+        given(
+            File::any(),
+        ),
+        static function($assert, $file) {
+            $local = Machine::new('local.dev')
+                ->listen(
+                    Machine\HTTP::of(
+                        static fn($request, $os) => $os
+                            ->filesystem()
+                            ->mount(Path::of('/somewhere/'))
+                            ->recover(Recover::mount(...))
+                            ->flatMap(static fn($adapter) => $adapter->add($file))
+                            ->map(static fn() => Response::of(
+                                StatusCode::ok,
+                                $request->protocolVersion(),
+                            )),
+                    ),
+                )
+                ->install(
+                    'foo',
+                    Machine\CLI::of(
+                        static fn($_, $builder, $os) => $builder->success(
+                            $os
+                                ->filesystem()
+                                ->mount(Path::of('/somewhere/'))
+                                ->maybe()
+                                ->flatMap(static fn($adapter) => $adapter->get($file->name()))
+                                ->toSequence()
+                                ->flatMap(static fn($file) => $file->content()->chunks())
+                                ->map(static fn($chunk) => Output\Chunk::of(
+                                    $chunk,
+                                    Output\Type::output,
+                                )),
+                        ),
+                    ),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->true(
+                $response->statusCode()->successful(),
+            );
+
+            $stored = $cluster
+                ->ssh('local.dev')
+                ->flatMap(static fn($run) => $run(Command::foreground('foo')))
+                ->unwrap()
+                ->output()
+                ->map(static fn($chunk) => $chunk->data())
+                ->fold(new Concat)
+                ->toString();
+
+            $assert->same($file->content()->toString(), $stored);
+        },
+    );
+
+    yield proof(
+        'Each machine has its own filesystem',
+        given(
+            File::any(),
+        ),
+        static function($assert, $file) {
+            $local = Machine::new('local.dev')
+                ->listen(
+                    Machine\HTTP::of(
+                        static fn($request, $os) => $os
+                            ->filesystem()
+                            ->mount(Path::of('/somewhere/'))
+                            ->recover(Recover::mount(...))
+                            ->flatMap(static fn($adapter) => $adapter->add($file))
+                            ->map(static fn() => Response::of(
+                                StatusCode::ok,
+                                $request->protocolVersion(),
+                            )),
+                    ),
+                );
+            $remote = Machine::new('remote.dev')
+                ->install(
+                    'foo',
+                    Machine\CLI::of(
+                        static fn($_, $builder, $os) => $builder->success(
+                            $os
+                                ->filesystem()
+                                ->mount(Path::of('/somewhere/'))
+                                ->maybe()
+                                ->flatMap(static fn($adapter) => $adapter->get($file->name()))
+                                ->toSequence()
+                                ->flatMap(static fn($file) => $file->content()->chunks())
+                                ->map(static fn($chunk) => Output\Chunk::of(
+                                    $chunk,
+                                    Output\Type::output,
+                                )),
+                        ),
+                    ),
+                );
+            $cluster = Cluster::new()
+                ->add($local)
+                ->boot();
+
+            $response = $cluster
+                ->http(Request::of(
+                    Url::of('http://local.dev/'),
+                    Method::get,
+                    ProtocolVersion::v11,
+                ))
+                ->unwrap();
+
+            $assert->true(
+                $response->statusCode()->successful(),
+            );
+
+            $stored = $cluster
+                ->ssh('local.dev')
+                ->flatMap(static fn($run) => $run(Command::foreground('foo')))
+                ->unwrap()
+                ->output()
+                ->map(static fn($chunk) => $chunk->data())
+                ->fold(new Concat)
+                ->toString();
+
+            $assert->same('', $stored);
         },
     );
 };
