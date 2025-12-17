@@ -24,7 +24,7 @@ final class Latency
 
     public function __invoke(NTPServer $ntp): void
     {
-        $this
+        $_ = $this
             ->latencies
             ->pull()
             ->map(Period::millisecond(...))
