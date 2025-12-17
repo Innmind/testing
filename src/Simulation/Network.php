@@ -47,7 +47,6 @@ final class Network
     /**
      * @param non-empty-list<string> $domains
      */
-    #[\NoDiscard]
     public function with(array $domains, Machine $machine): void
     {
         foreach ($domains as $domain) {
